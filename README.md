@@ -4,6 +4,8 @@
 
 The idea is to keep a small backlog of long videos and forward a new one to your agent every time you record. The agent (Hermes / Openclaw / whatever you're running) saves it into the input folder for you — you don't manage paths yourself, you just send the video in chat. Once a day the skill picks one video from that folder (newest unprocessed first, so the one you just sent jumps the queue), decides which moments are worth clipping, cuts them, overlays a punchy hook on top, and asks you (in the same chat channel) which ones you want to publish. You reply with the clip IDs. It schedules them on TikTok / Instagram / YouTube via [Upload-Post](https://upload-post.com).
 
+**Input videos should already be 9:16 vertical** (1080×1920 ideally) and ready to post on social — with your subtitles already burned in if you want subs. The skill does NOT reformat, crop, or burn subtitles. It only cuts and adds a hook text overlay on top. Treat the input folder as "near-final long-form footage", not raw camera dumps.
+
 It's the same workflow Opus Clip / Vizard sell, but you own every piece of it and you stay in the loop on what actually ships.
 
 ---
