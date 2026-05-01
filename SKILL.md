@@ -1,7 +1,12 @@
 ---
 name: autoshorts
 description: "Daily pipeline that picks one long video from a folder, transcribes it with Whisper, uses Gemini 3 Flash multimodal to find every viral short-form moment, cuts each candidate with FFmpeg, adds a hook-text overlay, presents the candidates to the user for approval, and publishes the approved clips to TikTok / Instagram Reels / YouTube Shorts via the Upload-Post API. Use when the user wants to create shorts/reels/clips from longer videos, mentions autoshorts, viral clips, or content repurposing, or asks for the daily clip batch."
-version: "2.0.0"
+license: MIT
+compatibility: "Requires ffmpeg, Python 3.11+, faster-whisper, google-genai SDK, Pillow, and internet access for the Gemini and Upload-Post APIs. Designed to run inside an agent harness (Hermes / Openclaw / Claude Code) — works headless on a VPS."
+metadata:
+  author: mutonby
+  version: "2.0.0"
+  homepage: "https://github.com/mutonby/skill-autoshorts"
 ---
 
 # AutoShorts — Daily Viral Clip Pipeline
