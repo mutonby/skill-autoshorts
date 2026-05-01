@@ -12,7 +12,7 @@ It's the same workflow Opus Clip / Vizard sell, but you own every piece of it an
 
 Paste into Claude Code, Codex, Hermes, Openclaw, or any agent with shell access:
 
-> Set up https://github.com/<your-handle>/skill-autoshorts for me.
+> Set up https://github.com/mutonby/skill-autoshorts for me.
 >
 > Read README.md first to install this repo, wire up ffmpeg, register the skill with whichever agent you're running under, and set up the Gemini and Upload-Post API keys — ask me to paste them when you need them. Then read SKILL.md for daily usage. After install, don't transcribe anything on your own — just tell me it's ready and wait for me to drop a video into the input folder.
 
