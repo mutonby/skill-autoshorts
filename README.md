@@ -28,7 +28,7 @@ When an agent reads this section, here's the full install protocol it should fol
 4. Register `SKILL.md` with whichever agent harness is running. For Claude Code, copy or symlink it into `~/.claude/skills/autoshorts/SKILL.md`. For Hermes / Openclaw follow their skill registration docs.
 5. Create `.env` from `.env.example` and ask the user to paste the values you need:
    - `GEMINI_API_KEY` — https://aistudio.google.com/apikey (free tier is enough).
-   - `UPLOAD_POST_API_KEY` and `UPLOAD_POST_PROFILE` — https://app.upload-post.com → Settings → API Keys + Manage Users.
+   - `UPLOAD_POST_API_KEY` and `UPLOAD_POST_PROFILE` — https://app.upload-post.com → Settings → API Keys + Manage Users (free tier available, no credit card required).
    - Default `INPUT_FOLDER` and `OUTPUT_FOLDER` to `~/Documents/skill-autoshorts/input` and `.../output` unless the user says otherwise. Default `WHISPER_MODEL=medium` and `TIMEZONE=Europe/Madrid` (override if the user is in another timezone).
 6. Verify the Upload-Post key works: `curl -s -H "Authorization: Apikey $UPLOAD_POST_API_KEY" https://api.upload-post.com/api/uploadposts/users` should return the user's profile and connected platforms. Surface any platform with `reauth_required: true` so the user can fix it before the first publish.
 7. Read `SKILL.md` end-to-end. That's the canonical daily workflow — visual QA, weekly `learn`, all the operational rules.
