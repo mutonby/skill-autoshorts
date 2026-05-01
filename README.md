@@ -84,15 +84,13 @@ Most "auto-clip" tools either (a) work from text only and miss the visual cues t
 
 ## Usage
 
-### As a Claude Code skill (recommended)
+### Inside an agent harness (recommended — Hermes / Openclaw / similar)
 
-```
-/autoshorts
-```
+This is what the skill is built for. An agent harness on a VPS runs the daily cron, pings you on your messenger ("here are today's candidates, which do I publish?"), captures your reply, and closes the loop. You drop new videos in chat whenever you record; you get a daily push of clip candidates; you reply with IDs from your phone. Hands-off after install.
 
-The skill (defined in `~/.claude/skills/autoshorts/SKILL.md`) walks Claude through the whole pipeline: pick the next unprocessed video → transcribe → analyze → cut + hook all candidates → present them to you for approval → generate platform-specific copy → publish.
+The skill itself doesn't talk to Telegram / WhatsApp / etc. — the harness does. The skill just runs the pipeline and surfaces a candidates table; the harness forwards it to your messenger and pipes your reply back.
 
-When wired up to **openclaw**, this whole conversation happens via your messenger — Claude asks "which clip IDs?", openclaw forwards the question + the clip files to your phone, you reply "1, 3, 5", and the pipeline continues.
+For invocation, the harness either fires `/autoshorts` on its daily cron, or invokes the equivalent in its own skill system. SKILL.md is the contract.
 
 ### As a standalone CLI
 
