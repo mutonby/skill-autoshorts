@@ -2,7 +2,7 @@
 
 > Turn long videos into a daily stream of viral short-form clips for TikTok, Instagram Reels and YouTube Shorts — with a human-in-the-loop approval step you can answer from your phone.
 
-The idea is to keep a folder full of long videos and add a new one every time you record. Once a day the skill picks one video from the folder (newest unprocessed first, so the one you just dropped jumps the queue), decides which moments are worth clipping, cuts them, overlays a punchy hook on top, and asks you (via Telegram / WhatsApp / whatever messenger your orchestrator is wired to) which ones you want to publish. You reply with the clip IDs. It schedules them on TikTok / Instagram / YouTube via [Upload-Post](https://upload-post.com).
+The idea is to keep a small backlog of long videos and forward a new one to your agent every time you record. The agent (Hermes / Openclaw / whatever you're running) saves it into the input folder for you — you don't manage paths yourself, you just send the video in chat. Once a day the skill picks one video from that folder (newest unprocessed first, so the one you just sent jumps the queue), decides which moments are worth clipping, cuts them, overlays a punchy hook on top, and asks you (in the same chat channel) which ones you want to publish. You reply with the clip IDs. It schedules them on TikTok / Instagram / YouTube via [Upload-Post](https://upload-post.com).
 
 It's the same workflow Opus Clip / Vizard sell, but you own every piece of it and you stay in the loop on what actually ships.
 
@@ -12,9 +12,32 @@ It's the same workflow Opus Clip / Vizard sell, but you own every piece of it an
 
 Paste into Claude Code, Codex, Hermes, Openclaw, or any agent with shell access:
 
-> Set up https://github.com/mutonby/skill-autoshorts for me.
->
-> Read README.md first to install this repo, wire up ffmpeg, register the skill with whichever agent you're running under, and set up the Gemini and Upload-Post API keys — ask me to paste them when you need them. Then read SKILL.md for daily usage. After install, don't transcribe anything on your own — just tell me it's ready and wait for me to drop a video into the input folder.
+> Set up https://github.com/mutonby/skill-autoshorts for me. Read README.md.
+
+---
+
+## Install
+
+When an agent reads this section, here's the full install protocol it should follow:
+
+1. Clone or `git pull` this repo into `~/Documents/skill-autoshorts/` (or whatever path the user prefers).
+2. Make sure `ffmpeg` is installed (`brew install ffmpeg` on macOS, `apt install ffmpeg` on Linux). Verify with `ffmpeg -version`.
+3. Create the venv and install Python deps: `python3 -m venv venv && ./venv/bin/pip install -r requirements.txt`.
+4. Register `SKILL.md` with whichever agent harness is running. For Claude Code, copy or symlink it into `~/.claude/skills/autoshorts/SKILL.md`. For Hermes / Openclaw follow their skill registration docs.
+5. Create `.env` from `.env.example` and ask the user to paste the values you need:
+   - `GEMINI_API_KEY` — https://aistudio.google.com/apikey (free tier is enough).
+   - `UPLOAD_POST_API_KEY` and `UPLOAD_POST_PROFILE` — https://app.upload-post.com → Settings → API Keys + Manage Users.
+   - Default `INPUT_FOLDER` and `OUTPUT_FOLDER` to `~/Documents/skill-autoshorts/input` and `.../output` unless the user says otherwise. Default `WHISPER_MODEL=medium` and `TIMEZONE=Europe/Madrid` (override if the user is in another timezone).
+6. Verify the Upload-Post key works: `curl -s -H "Authorization: Apikey $UPLOAD_POST_API_KEY" https://api.upload-post.com/api/uploadposts/users` should return the user's profile and connected platforms. Surface any platform with `reauth_required: true` so the user can fix it before the first publish.
+7. Read `SKILL.md` end-to-end. That's the canonical daily workflow — visual QA, weekly `learn`, all the operational rules.
+
+**After install, do nothing else.** Don't transcribe, don't call Gemini, don't publish. Tell the user everything is ready, summarize what's connected on Upload-Post, and wait. The user will forward videos to you in chat going forward — your job is to save each one into `INPUT_FOLDER` and invoke the skill (`/autoshorts` or equivalent) when they ask.
+
+### Notes for the user during install
+
+- The first transcribe call downloads Whisper `medium` (~1.5 GB). Subsequent runs are instant.
+- Upload-Post platform requirements: **TikTok** any account works · **Instagram** must be a Business or Creator account linked to a Facebook Page · **YouTube** any Google account · LinkedIn / Reddit / Threads / X also supported.
+- The `UPLOAD_POST_PROFILE` value is the **profile name** you create in Upload-Post → Manage Users, NOT your social handle.
 
 ---
 
@@ -54,65 +77,6 @@ Most "auto-clip" tools either (a) work from text only and miss the visual cues t
 1. **Whisper is the clock.** Word-level timestamps mean every cut starts and ends on a clean word boundary. No mid-syllable chops, no half-breaths.
 2. **Gemini Flash is the editor.** It's multimodal — we send the actual video file via the Files API along with the transcript. It can see a punchline land, hear laughter, notice a scene change, react to a chart on screen. Crucially, the prompt forces it to use timestamps from the Whisper transcript, so it can't hallucinate "20.5s" and miss by a syllable.
 3. **The pipeline is human-gated.** The model proposes; you dispose. Every candidate is cut and rendered before you see it, so you review the actual final video, not a description. You answer from your phone.
-
----
-
-## Manual install
-
-If you'd rather install by hand instead of pasting the setup prompt above, the same steps written out:
-
-### 1. System dependencies
-
-```bash
-# Python 3.11+ recommended
-brew install ffmpeg            # macOS
-# (or apt install ffmpeg on Linux)
-```
-
-### 2. Project install
-
-```bash
-cd ~/Documents/skill-autoshorts
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-The first run downloads Whisper `medium` (~1.5 GB). Subsequent runs are instant.
-
-### 3. `.env`
-
-Copy `.env.example` to `.env` and fill in:
-
-| Key | Where to get it |
-|---|---|
-| `GEMINI_API_KEY` | https://aistudio.google.com/apikey |
-| `UPLOAD_POST_API_KEY` | Upload-Post dashboard → Settings → API Keys |
-| `UPLOAD_POST_PROFILE` | Upload-Post dashboard → Manage Users → profile name (NOT your social handle) |
-| `INPUT_FOLDER` | absolute path where you'll drop long videos |
-| `OUTPUT_FOLDER` | absolute path for generated clips |
-| `WHISPER_MODEL` | `medium` (default) — `small` is faster, `large-v3` is more accurate |
-| `TIMEZONE` | IANA tz, e.g. `Europe/Madrid` |
-
-### 4. Connect your social accounts on Upload-Post
-
-In the Upload-Post dashboard, OAuth-connect the platforms you want to publish to:
-- **TikTok**: any account works
-- **Instagram**: must be a Business or Creator account, linked to a Facebook Page
-- **YouTube**: any Google account
-- (LinkedIn, Reddit, Threads, X, etc. also supported)
-
-Then create a **profile** in Manage Users that groups them. The profile name is what goes in `UPLOAD_POST_PROFILE`.
-
-### 5. Sanity-check
-
-```bash
-# Confirm the API key works and your platforms are connected
-curl -s -H "Authorization: Apikey $UPLOAD_POST_API_KEY" \
-    https://api.upload-post.com/api/uploadposts/users | python -m json.tool
-```
-
-Look at `social_accounts.<platform>.reauth_required` — if any of your target platforms says `true`, reauthorize from the dashboard before publishing.
 
 ---
 

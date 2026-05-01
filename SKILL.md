@@ -67,7 +67,7 @@ Before doing any work, check that the environment is ready and ask the user for 
 
 If the user provides an API key in the conversation, write it to `.env` immediately, never echo it back, and **warn that the key is now in conversation logs and they should rotate it after testing.**
 
-If the user passes a video path that is NOT inside `INPUT_FOLDER` (e.g. `/autoshorts /Users/foo/Downloads/podcast.mp4`), copy it into `INPUT_FOLDER` first (use `cp`, do not move — the original stays put). Otherwise `pick` will not find it.
+**How videos arrive into `INPUT_FOLDER`** is the harness's job, not the skill's. The canonical flow: the user forwards a video to openclaw / Hermes / their agent in chat (Telegram / WhatsApp / etc.), the harness downloads it and saves it to `INPUT_FOLDER`. The skill itself only operates on files that are already there. If the user passes a video path that is NOT inside `INPUT_FOLDER` (e.g. `/autoshorts /Users/foo/Downloads/podcast.mp4`), copy it in first (use `cp`, do not move — the original stays put). Otherwise `pick` will not find it.
 
 ### Step 1 — Pick the video
 
