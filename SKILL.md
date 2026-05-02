@@ -55,7 +55,7 @@ If the skill is invoked outside openclaw (e.g., user runs `/autoshorts` directly
 
 ## Daily workflow
 
-This skill is meant to run as a **daily infinite loop**. Every run picks ONE video that has not been processed yet and walks it through the pipeline. The state file at `state/processed.json` is the source of truth — once a video's sha256 is in there, it is never picked again. If the user adds a new video tomorrow, it gets priority over older unprocessed ones (sort is mtime DESC), so fresh material always jumps the queue. Old unprocessed videos still get picked eventually as the queue drains.
+This skill is meant to run as a **daily infinite loop**. Every run picks ONE video and walks it through the pipeline. Pick semantics are **round-robin per cycle**: each video is picked at most once per cycle. When every video in `INPUT_FOLDER` has been processed in the current cycle, a new cycle automatically starts and the same videos become available again — generating fresh clips from already-clipped sources. The state file at `state/processed.json` tracks `cycle_started_at`, `last_processed_at` per video, and `cycles_count` per video. Inside a cycle, the next pick is the newest unprocessed-this-cycle (mtime DESC), so fresh material always jumps the queue.
 
 ### Step 0 — Preflight (run on every invocation, do not skip)
 
@@ -82,11 +82,18 @@ If the user provides an API key in the conversation, write it to `.env` immediat
 python autoshorts.py pick
 ```
 
-Returns JSON with the next unprocessed video (newest mtime first, drops anything whose sha256 is already in `state/processed.json`). If the user just dropped a new file in the folder it will be picked first. If `remaining_unprocessed: 0` and the command exits with "all videos already processed", **stop and tell the user**:
+Returns JSON with the next video to process. Output fields:
+- `path`, `name`, `size_mb`, `mtime`, `duration_s` — file metadata.
+- `previous_cycles_completed` — how many cycles this video has already been through (0 means first time ever).
+- `remaining_in_cycle` — how many other videos are still untouched in the current cycle.
+- `cycle_started_at` — timestamp of the current cycle's start.
+- `new_cycle_started` — `true` if THIS pick is the one that opened a fresh cycle (every video has been processed in the previous cycle, the loop wraps around).
 
-> *No hay videos nuevos en `INPUT_FOLDER`. Suelta uno y vuelve a invocar la skill.*
+If `new_cycle_started` is `true`, mention it to the user briefly ("starting a new cycle — already clipped this video N times before, going for fresh moments"). It's not an error — it's the expected wrap-around. Gemini will likely pick different moments since the prompt is non-deterministic and HOT.md priors evolve over time.
 
-Do NOT try to bypass the state file or reprocess anything — that's a hard rule. If the user explicitly says "reprocess video X", remove that entry from `state/processed.json` first, then run pick.
+The pipeline does NOT hard-stop when it runs out of fresh videos. The only hard-stop case is `INPUT_FOLDER` being empty — surface that and ask the user to drop something in.
+
+If the user explicitly says "reprocess video X right now" out of cycle order, remove that entry from `state/processed.json` first, then run pick. Do NOT bypass the cycle logic by other means.
 
 ### Step 2 — Transcribe
 

@@ -78,18 +78,24 @@ def sha256_of(path: Path) -> str:
 
 def load_state() -> dict:
     if not STATE_FILE.exists():
-        return {"processed": []}
-    return json.loads(STATE_FILE.read_text())
+        return {"cycle_started_at": None, "processed": []}
+    state = json.loads(STATE_FILE.read_text())
+    state.setdefault("cycle_started_at", None)
+    state.setdefault("processed", [])
+    # Backfill schema: old records may only have processed_at, not last_processed_at.
+    for rec in state["processed"]:
+        if "last_processed_at" not in rec:
+            rec["last_processed_at"] = rec.get("processed_at")
+        if "first_processed_at" not in rec:
+            rec["first_processed_at"] = rec.get("processed_at")
+        if "cycles_count" not in rec:
+            rec["cycles_count"] = 1
+    return state
 
 
 def save_state(state: dict) -> None:
     STATE_FOLDER.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
-
-
-def is_processed(video: Path, state: dict) -> bool:
-    digest = sha256_of(video)
-    return any(rec.get("hash") == digest for rec in state["processed"])
 
 
 def video_slug(video: Path) -> str:
@@ -143,8 +149,10 @@ def ffprobe_dimensions(video: Path) -> tuple[int, int]:
 def cmd_pick(_: argparse.Namespace) -> None:
     """Print the path of the next video to process.
 
-    Strategy: list all videos in INPUT_FOLDER, drop those already processed
-    (matched by sha256), sort the rest by mtime DESC. Newest unprocessed wins.
+    Cycle strategy: each video is picked at most once per cycle. When every
+    video in INPUT_FOLDER has been processed in the current cycle, a new cycle
+    starts and they all become available again. Newest unprocessed-this-cycle
+    wins, so freshly added videos still jump the queue.
     """
     if not INPUT_FOLDER.exists():
         raise SystemExit(f"INPUT_FOLDER not found: {INPUT_FOLDER}")
@@ -157,25 +165,43 @@ def cmd_pick(_: argparse.Namespace) -> None:
         raise SystemExit(f"no videos in {INPUT_FOLDER}")
 
     state = load_state()
-    processed_hashes = {rec["hash"] for rec in state["processed"]}
+    cycle_start = state.get("cycle_started_at")
+    by_hash = {rec["hash"]: rec for rec in state["processed"]}
 
-    unprocessed = []
-    for p in candidates:
-        if sha256_of(p) not in processed_hashes:
-            unprocessed.append(p)
+    def is_available(p: Path) -> bool:
+        rec = by_hash.get(sha256_of(p))
+        if rec is None:
+            return True  # never processed
+        last = rec.get("last_processed_at")
+        if cycle_start is None or last is None:
+            return False  # processed before cycle tracking existed → treat as taken
+        return last < cycle_start
 
-    if not unprocessed:
-        raise SystemExit("all videos already processed")
+    available = [p for p in candidates if is_available(p)]
+    new_cycle = False
 
-    unprocessed.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    chosen = unprocessed[0]
+    if not available:
+        # All videos processed in current cycle → start a new one.
+        state["cycle_started_at"] = datetime.now().isoformat(timespec="seconds")
+        save_state(state)
+        cycle_start = state["cycle_started_at"]
+        available = list(candidates)
+        new_cycle = True
+
+    available.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    chosen = available[0]
+    rec = by_hash.get(sha256_of(chosen)) or {}
+
     print(json.dumps({
         "path": str(chosen),
         "name": chosen.name,
         "size_mb": round(chosen.stat().st_size / 1_000_000, 1),
         "mtime": datetime.fromtimestamp(chosen.stat().st_mtime).isoformat(),
         "duration_s": round(ffprobe_duration(chosen), 1),
-        "remaining_unprocessed": len(unprocessed) - 1,
+        "previous_cycles_completed": rec.get("cycles_count", 0),
+        "remaining_in_cycle": len(available) - 1,
+        "cycle_started_at": cycle_start,
+        "new_cycle_started": new_cycle,
     }, indent=2))
 
 
@@ -607,19 +633,43 @@ def cmd_mark_processed(args: argparse.Namespace) -> None:
     video = Path(args.video).resolve()
     state = load_state()
     digest = sha256_of(video)
-    if any(rec["hash"] == digest for rec in state["processed"]):
-        print(f"already marked: {video.name}")
-        return
-    state["processed"].append({
-        "path": str(video),
-        "name": video.name,
-        "hash": digest,
-        "processed_at": datetime.now().isoformat(timespec="seconds"),
-        "clips_generated": args.clips_generated,
-        "clips_published": args.clips_published,
-    })
+    now = datetime.now().isoformat(timespec="seconds")
+
+    if state.get("cycle_started_at") is None:
+        state["cycle_started_at"] = now
+
+    existing = next((r for r in state["processed"] if r["hash"] == digest), None)
+    if existing:
+        existing["last_processed_at"] = now
+        existing["cycles_count"] = existing.get("cycles_count", 1) + 1
+        existing.setdefault("history", []).append({
+            "processed_at": now,
+            "clips_generated": args.clips_generated,
+            "clips_published": args.clips_published,
+        })
+        existing["clips_generated"] = args.clips_generated
+        existing["clips_published"] = args.clips_published
+        cycle_n = existing["cycles_count"]
+    else:
+        rec = {
+            "path": str(video),
+            "name": video.name,
+            "hash": digest,
+            "first_processed_at": now,
+            "last_processed_at": now,
+            "cycles_count": 1,
+            "clips_generated": args.clips_generated,
+            "clips_published": args.clips_published,
+            "history": [{
+                "processed_at": now,
+                "clips_generated": args.clips_generated,
+                "clips_published": args.clips_published,
+            }],
+        }
+        state["processed"].append(rec)
+        cycle_n = 1
     save_state(state)
-    print(f"marked: {video.name}")
+    print(f"marked: {video.name} (cycle #{cycle_n})")
 
 
 def cmd_list_processed(_: argparse.Namespace) -> None:
